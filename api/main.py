@@ -4,6 +4,10 @@ from pydantic import BaseModel
 from models.enhanced_fact_checker import EnhancedFactChecker
 import os
 
+# Environment configuration
+PRODUCTION_MODE = os.getenv("PRODUCTION_MODE", "true").lower() == "true"
+MEMORY_LIMIT = os.getenv("MEMORY_LIMIT", "512").lower()  # MB
+
 app = FastAPI(
     title="Enhanced Fake News Detection API",
     description="Advanced fake news detection using ML + source credibility + fact-checking APIs",
@@ -44,11 +48,21 @@ class PredictionResponse(BaseModel):
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize models on startup - load saved models or train new ones"""
+    """Initialize models on startup - optimized based on environment"""
     try:
         print("🚀 Starting Enhanced Fake News Detection API...")
-        detector.base_detector.initialize_models()
-        print("✅ Enhanced API is ready to serve requests!")
+        print(f"Production Mode: {PRODUCTION_MODE}")
+        print(f"Memory Limit: {MEMORY_LIMIT}MB")
+        
+        if PRODUCTION_MODE:
+            # Production mode: only load models, not dataset
+            detector.base_detector.initialize_models_only()
+            print("✅ Production mode: Models loaded without dataset to save memory")
+        else:
+            # Development mode: load models and dataset
+            detector.base_detector.initialize_models(fast_mode=True)
+            print("✅ Development mode: Models and sample dataset loaded")
+            
         print("📊 Features: ML + Source Credibility + Pattern Analysis + Fact-Check Integration")
     except FileNotFoundError as e:
         print(f"❌ Warning: Dataset files not found: {e}")
@@ -75,7 +89,9 @@ async def root():
         "endpoints": {
             "predict": "/predict",
             "health": "/health",
-            "metrics": "/metrics"
+            "metrics": "/metrics",
+            "dataset-stats": "/dataset-stats",
+            "load-dataset-for-analytics": "/load-dataset-for-analytics"
         }
     }
 
@@ -154,7 +170,24 @@ async def get_model_metrics():
 async def get_dataset_stats():
     """Get statistics about the training dataset"""
     try:
-        return detector.base_detector.get_dataset_stats()
+        stats = detector.base_detector.get_dataset_stats()
+        if 'error' in stats:
+            stats['note'] = "Dataset not loaded in production mode. Use /load-dataset-for-analytics to load it."
+        return stats
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/load-dataset-for-analytics") 
+async def load_dataset_for_analytics():
+    """Load dataset for analytics (not normally loaded in production)"""
+    try:
+        print("Loading dataset for analytics...")
+        detector.base_detector.load_and_prepare_data(sample_size=10000)
+        return {
+            "message": "Dataset loaded successfully for analytics", 
+            "status": "completed",
+            "sample_size": 10000
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

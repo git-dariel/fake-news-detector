@@ -15,4 +15,5 @@ joblib==1.3.2
 scipy==1.11.4
 python-dotenv==1.0.0
 requests==2.31.0
-google-api-python-client==2.112.0 
+google-api-python-client==2.112.0
+psutil==5.9.6 

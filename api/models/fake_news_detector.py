@@ -14,18 +14,29 @@ from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from nltk.stem import PorterStemmer
 import warnings
-warnings.filterwarnings('ignore')
+import ssl
 
 # Download required NLTK data
 try:
+    _create_unverified_https_context = ssl._create_unverified_context
+except AttributeError:
+    pass
+else:
+    ssl._create_default_https_context = _create_unverified_https_context
+
+try:
     nltk.data.find('tokenizers/punkt')
 except LookupError:
-    nltk.download('punkt')
+    print("Downloading NLTK punkt tokenizer...")
+    nltk.download('punkt', quiet=True)
 
 try:
     nltk.data.find('corpora/stopwords')
 except LookupError:
-    nltk.download('stopwords')
+    print("Downloading NLTK stopwords...")
+    nltk.download('stopwords', quiet=True)
+
+warnings.filterwarnings('ignore')
 
 class FakeNewsDetector:
     def __init__(self):
@@ -94,6 +105,18 @@ class FakeNewsDetector:
         
         self.train_models()
         return True
+    
+    def initialize_models_only(self):
+        """Initialize models for production - only load saved models, no dataset"""
+        if self._models_exist():
+            print("Found existing trained models...")
+            if self.load_saved_models():
+                print("✅ Production models loaded successfully! (Dataset not loaded to save memory)")
+                return True
+        
+        print("❌ No pre-trained models found. Please train models first.")
+        print("For development, use initialize_models() instead.")
+        return False
     
     def preprocess_text(self, text):
         """Preprocess text for feature extraction"""
@@ -182,12 +205,12 @@ class FakeNewsDetector:
             X, y, test_size=0.2, random_state=42, stratify=y
         )
         
-        # Create TF-IDF vectorizer with improved parameters
+        # Create TF-IDF vectorizer with optimized parameters for production
         self.vectorizer = TfidfVectorizer(
-            max_features=15000,  # Increased from 10000 for more features
-            min_df=3,           # Increased from 2 to reduce noise
-            max_df=0.7,         # Reduced from 0.8 to exclude very common words
-            ngram_range=(1, 3), # Increased to trigrams for better context
+            max_features=8000,  # Reduced from 15000 for memory optimization
+            min_df=3,           # Keep same to reduce noise
+            max_df=0.7,         # Keep same to exclude very common words
+            ngram_range=(1, 2), # Reduced from (1,3) to (1,2) for memory savings
             sublinear_tf=True,  # Use sublinear TF scaling
             smooth_idf=True     # Smooth IDF weights
         )
@@ -207,15 +230,15 @@ class FakeNewsDetector:
         )
         self.decision_tree_model.fit(X_train_tfidf, self.y_train)
         
-        # Train Random Forest with improved parameters
+        # Train Random Forest with optimized parameters for production
         print("Training Random Forest...")
         self.random_forest_model = RandomForestClassifier(
-            n_estimators=200,      # Increased from 100 for better ensemble
-            max_depth=30,          # Increased from 20 for more complexity
-            min_samples_split=8,   # Reduced from 10
-            min_samples_leaf=3,    # Reduced from 5
+            n_estimators=100,      # Reduced from 200 for faster training and less memory
+            max_depth=20,          # Reduced from 30 for memory optimization
+            min_samples_split=10,  # Increased from 8 to prevent overfitting
+            min_samples_leaf=5,    # Increased from 3 to prevent overfitting
             max_features='sqrt',   # Better feature selection
-            n_jobs=-1,            # Use all CPU cores
+            n_jobs=1,             # Reduced from -1 to limit memory usage
             random_state=42
         )
         self.random_forest_model.fit(X_train_tfidf, self.y_train)
