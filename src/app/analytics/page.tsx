@@ -70,7 +70,7 @@ export default function AnalyticsPage() {
       // Handle the new enhanced API response format
       const enhancedModelInfo = {
         models_trained: ["Decision Tree", "Random Forest"],
-        vectorizer_features: 5000, // Default value
+        vectorizer_features: 15000, // Restored to original value
         training_samples: 0, // Will be updated from base_model_metrics if available
         test_samples: 0, // Will be updated from base_model_metrics if available
         metrics: modelData.base_model_metrics || {},
@@ -369,103 +369,106 @@ export default function AnalyticsPage() {
         )}
 
         {/* Subject Distribution */}
-        {datasetStats && datasetStats.subjects && datasetStats.total_articles && (
-          <div>
-            <h2 className="text-2xl font-bold text-white mb-6">Subject Distribution</h2>
-            <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-8">
-              <div className="grid md:grid-cols-2 gap-8">
-                <div>
-                  <h3 className="text-lg font-semibold text-white mb-4">Top Subjects</h3>
-                  <div className="space-y-3">
-                    {Object.entries(datasetStats.subjects || {})
-                      .sort(([, a], [, b]) => (b as number) - (a as number))
-                      .slice(0, 8)
-                      .map(([subject, count], index) => {
-                        const maxCount = Math.max(
-                          ...Object.values(datasetStats.subjects || {})
-                        ) as number;
-                        return (
-                          <div key={subject} className="flex justify-between items-center">
-                            <span className="text-white/70 truncate flex-1 mr-4">{subject}</span>
-                            <div className="flex items-center">
-                              <div className="w-32 bg-gray-700 rounded-full h-2 mr-3">
-                                <div
-                                  className="bg-blue-400 h-2 rounded-full"
-                                  style={{
-                                    width: `${((count as number) / maxCount) * 100}%`,
-                                  }}
-                                ></div>
+        {datasetStats &&
+          datasetStats.subjects &&
+          Object.keys(datasetStats.subjects).length > 0 &&
+          datasetStats.total_articles && (
+            <div>
+              <h2 className="text-2xl font-bold text-white mb-6">Subject Distribution</h2>
+              <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-8">
+                <div className="grid md:grid-cols-2 gap-8">
+                  <div>
+                    <h3 className="text-lg font-semibold text-white mb-4">Top Subjects</h3>
+                    <div className="space-y-3">
+                      {Object.entries(datasetStats.subjects || {})
+                        .sort(([, a], [, b]) => (b as number) - (a as number))
+                        .slice(0, 8)
+                        .map(([subject, count], index) => {
+                          const maxCount = Math.max(
+                            ...Object.values(datasetStats.subjects || {})
+                          ) as number;
+                          return (
+                            <div key={subject} className="flex justify-between items-center">
+                              <span className="text-white/70 truncate flex-1 mr-4">{subject}</span>
+                              <div className="flex items-center">
+                                <div className="w-32 bg-gray-700 rounded-full h-2 mr-3">
+                                  <div
+                                    className="bg-blue-400 h-2 rounded-full"
+                                    style={{
+                                      width: `${((count as number) / maxCount) * 100}%`,
+                                    }}
+                                  ></div>
+                                </div>
+                                <span className="text-white w-16 text-right">
+                                  {(count as number).toLocaleString()}
+                                </span>
                               </div>
-                              <span className="text-white w-16 text-right">
-                                {(count as number).toLocaleString()}
-                              </span>
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                    </div>
                   </div>
-                </div>
 
-                <div>
-                  <h3 className="text-lg font-semibold text-white mb-4">Dataset Balance</h3>
-                  <div className="space-y-4">
-                    <div>
-                      <div className="flex justify-between mb-2">
-                        <span className="text-white/70">Fake News</span>
-                        <span className="text-red-400">
-                          {(
-                            ((datasetStats.fake_articles || 0) /
-                              (datasetStats.total_articles || 1)) *
-                            100
-                          ).toFixed(1)}
-                          %
-                        </span>
-                      </div>
-                      <div className="w-full bg-gray-700 rounded-full h-3">
-                        <div
-                          className="bg-red-400 h-3 rounded-full"
-                          style={{
-                            width: `${
+                  <div>
+                    <h3 className="text-lg font-semibold text-white mb-4">Dataset Balance</h3>
+                    <div className="space-y-4">
+                      <div>
+                        <div className="flex justify-between mb-2">
+                          <span className="text-white/70">Fake News</span>
+                          <span className="text-red-400">
+                            {(
                               ((datasetStats.fake_articles || 0) /
                                 (datasetStats.total_articles || 1)) *
                               100
-                            }%`,
-                          }}
-                        ></div>
+                            ).toFixed(1)}
+                            %
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-700 rounded-full h-3">
+                          <div
+                            className="bg-red-400 h-3 rounded-full"
+                            style={{
+                              width: `${
+                                ((datasetStats.fake_articles || 0) /
+                                  (datasetStats.total_articles || 1)) *
+                                100
+                              }%`,
+                            }}
+                          ></div>
+                        </div>
                       </div>
-                    </div>
 
-                    <div>
-                      <div className="flex justify-between mb-2">
-                        <span className="text-white/70">Real News</span>
-                        <span className="text-green-400">
-                          {(
-                            ((datasetStats.real_articles || 0) /
-                              (datasetStats.total_articles || 1)) *
-                            100
-                          ).toFixed(1)}
-                          %
-                        </span>
-                      </div>
-                      <div className="w-full bg-gray-700 rounded-full h-3">
-                        <div
-                          className="bg-green-400 h-3 rounded-full"
-                          style={{
-                            width: `${
+                      <div>
+                        <div className="flex justify-between mb-2">
+                          <span className="text-white/70">Real News</span>
+                          <span className="text-green-400">
+                            {(
                               ((datasetStats.real_articles || 0) /
                                 (datasetStats.total_articles || 1)) *
                               100
-                            }%`,
-                          }}
-                        ></div>
+                            ).toFixed(1)}
+                            %
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-700 rounded-full h-3">
+                          <div
+                            className="bg-green-400 h-3 rounded-full"
+                            style={{
+                              width: `${
+                                ((datasetStats.real_articles || 0) /
+                                  (datasetStats.total_articles || 1)) *
+                                100
+                              }%`,
+                            }}
+                          ></div>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
       </div>
     </div>
   );

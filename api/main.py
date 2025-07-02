@@ -5,7 +5,7 @@ from models.enhanced_fact_checker import EnhancedFactChecker
 import os
 
 # Environment configuration
-PRODUCTION_MODE = os.getenv("PRODUCTION_MODE", "true").lower() == "true"
+PRODUCTION_MODE = os.getenv("PRODUCTION_MODE", "false").lower() == "true"  # Default to development mode
 MEMORY_LIMIT = os.getenv("MEMORY_LIMIT", "512").lower()  # MB
 
 app = FastAPI(
@@ -48,26 +48,37 @@ class PredictionResponse(BaseModel):
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize models on startup - optimized based on environment"""
+    """Initialize models on startup - load saved models or train new ones"""
     try:
         print("🚀 Starting Enhanced Fake News Detection API...")
-        print(f"Production Mode: {PRODUCTION_MODE}")
-        print(f"Memory Limit: {MEMORY_LIMIT}MB")
         
+        # Check if we're in production mode (optimize for speed)
         if PRODUCTION_MODE:
-            # Production mode: only load models, not dataset
-            detector.base_detector.initialize_models_only()
-            print("✅ Production mode: Models loaded without dataset to save memory")
+            print("Production mode: Loading models only (no dataset for faster startup)")
+            # In production, only load saved models for faster startup
+            if detector.base_detector._models_exist():
+                detector.base_detector.load_saved_models()
+            else:
+                print("❌ No saved models found in production mode!")
+                print("Please train models first or set PRODUCTION_MODE=false")
+                return
         else:
-            # Development mode: load models and dataset
-            detector.base_detector.initialize_models(fast_mode=True)
-            print("✅ Development mode: Models and sample dataset loaded")
-            
+            print("Development mode: Loading models (dataset loaded on demand)")
+            # In development, load models but not dataset (for faster startup)
+            detector.base_detector.initialize_models(load_dataset=False)
+        
+        print("✅ Enhanced API is ready to serve requests!")
         print("📊 Features: ML + Source Credibility + Pattern Analysis + Fact-Check Integration")
+        print("💡 Note: Dataset will be loaded on demand for analytics endpoints")
+        
     except FileNotFoundError as e:
         print(f"❌ Warning: Dataset files not found: {e}")
         print("Attempting to continue with pre-trained models only...")
-        # Don't raise the error, try to continue with pre-trained models
+        try:
+            detector.base_detector.load_saved_models()
+            print("✅ Pre-trained models loaded successfully!")
+        except Exception as model_error:
+            print(f"❌ Failed to load models: {model_error}")
     except Exception as e:
         print(f"❌ Error during model initialization: {e}")
         print("Attempting to continue with basic functionality...")
@@ -89,7 +100,9 @@ async def root():
         "endpoints": {
             "predict": "/predict",
             "health": "/health",
-            "metrics": "/metrics"
+            "metrics": "/metrics",
+            "dataset-stats": "/dataset-stats",
+            "load-dataset-for-analytics": "/load-dataset-for-analytics"
         }
     }
 
@@ -164,11 +177,45 @@ async def get_model_metrics():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/dataset-stats")
+async def get_dataset_stats():
+    """Get statistics about the training dataset"""
+    try:
+        stats = detector.base_detector.get_dataset_stats()
+        return stats
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/load-dataset-for-analytics") 
+async def load_dataset_for_analytics():
+    """Load dataset for analytics (not normally loaded in production)"""
+    try:
+        # Check if dataset is already loaded
+        if detector.base_detector.df is not None:
+            current_size = len(detector.base_detector.df)
+            return {
+                "message": f"Dataset already loaded with {current_size} articles", 
+                "status": "already_loaded",
+                "sample_size": current_size
+            }
+        
+        print("Loading dataset for analytics...")
+        detector.base_detector.load_and_prepare_data(sample_size=10000)
+        return {
+            "message": "Dataset loaded successfully for analytics", 
+            "status": "completed",
+            "sample_size": 10000,
+            "note": "This is a sample of the full dataset for faster loading"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/retrain-full-dataset")
 async def retrain_full_dataset():
     """Retrain models with the complete dataset for maximum accuracy"""
     try:
-        return {"error": "Dataset files not available in production deployment"}
+        detector.base_detector.retrain_full_dataset()
+        return {"message": "Models retrained successfully with full dataset", "status": "completed"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

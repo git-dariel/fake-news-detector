@@ -201,6 +201,95 @@ class EnhancedFactChecker:
             'total_patterns': len(suspicious_patterns)
         }
     
+    def generate_explanation(self, prediction: str, confidence: float, analysis: Dict[str, Any], 
+                           enhancement_details: Dict[str, Any], pure_ml_mode: bool = False) -> str:
+        """Generate a detailed explanation for why the news was classified as real or fake"""
+        
+        if pure_ml_mode:
+            return self._generate_pure_ml_explanation(prediction, confidence)
+        
+        return self._generate_enhanced_explanation(prediction, confidence, analysis, enhancement_details)
+    
+    def _generate_pure_ml_explanation(self, prediction: str, confidence: float) -> str:
+        """Generate explanation for pure ML mode"""
+        confidence_pct = confidence * 100
+        
+        if prediction == "FAKE":
+            if confidence_pct >= 90:
+                return f"Our machine learning models, trained on 44,000 verified articles with 99.8% accuracy, are {confidence_pct:.1f}% confident this is fake news based on linguistic patterns, writing style, and content structure commonly found in misinformation."
+            elif confidence_pct >= 75:
+                return f"The AI models detect several patterns typical of fake news with {confidence_pct:.1f}% confidence, including suspicious language patterns and content structure inconsistencies."
+            else:
+                return f"The machine learning analysis suggests this might be fake news with {confidence_pct:.1f}% confidence, though some elements are ambiguous and require careful verification."
+        else:  # REAL
+            if confidence_pct >= 90:
+                return f"Our AI models are {confidence_pct:.1f}% confident this is legitimate news based on professional writing patterns, factual presentation style, and content structure typical of reliable journalism."
+            elif confidence_pct >= 75:
+                return f"The analysis shows {confidence_pct:.1f}% confidence in authenticity based on journalistic writing style and absence of typical misinformation patterns."
+            else:
+                return f"The content appears likely authentic with {confidence_pct:.1f}% confidence, though some elements may benefit from additional verification."
+    
+    def _generate_enhanced_explanation(self, prediction: str, confidence: float, 
+                                     analysis: Dict[str, Any], enhancement_details: Dict[str, Any]) -> str:
+        """Generate explanation for enhanced mode"""
+        confidence_pct = confidence * 100
+        base_ml_confidence = enhancement_details.get('base_ml_confidence', 0) * 100
+        source_score = enhancement_details.get('source_credibility_score', 0) * 100
+        pattern_adjustment = enhancement_details.get('pattern_adjustment', 0) * 100
+        
+        explanation_parts = []
+        
+        # Start with base ML analysis
+        explanation_parts.append(f"Our AI models initially assessed this with {base_ml_confidence:.1f}% confidence")
+        
+        if prediction == "FAKE":
+            # Explain why it's fake
+            if base_ml_confidence >= 85:
+                explanation_parts.append("showing strong linguistic patterns associated with misinformation")
+            elif pattern_adjustment <= -20:
+                explanation_parts.append("and detected multiple suspicious content patterns including")
+                
+                patterns = analysis.get('pattern_analysis', {}).get('patterns', [])
+                suspicious_indicators = [p for p in patterns if any(keyword in p.lower() for keyword in 
+                                       ['clickbait', 'conspiracy', 'fake science', 'sensational'])]
+                if suspicious_indicators:
+                    explanation_parts.append(f"'{suspicious_indicators[0].split(': ')[1] if ': ' in suspicious_indicators[0] else suspicious_indicators[0]}'")
+            
+            if source_score < 40:
+                explanation_parts.append(f"The source credibility is low ({source_score:.0f}%)")
+            
+            fact_checks = analysis.get('fact_checks', [])
+            if fact_checks:
+                explanation_parts.append("and similar claims have been debunked by fact-checkers")
+                
+        else:  # REAL
+            # Explain why it's real
+            if base_ml_confidence >= 85:
+                explanation_parts.append("indicating professional journalistic writing patterns")
+            elif source_score >= 60:
+                explanation_parts.append(f"with credible source indicators (credibility score: {source_score:.0f}%)")
+            
+            patterns = analysis.get('pattern_analysis', {}).get('patterns', [])
+            positive_indicators = [p for p in patterns if 'scientific language' in p.lower()]
+            if positive_indicators:
+                explanation_parts.append("and contains legitimate scientific or factual language")
+            
+            if pattern_adjustment >= 0:
+                explanation_parts.append("without suspicious misinformation patterns")
+        
+        # Combine all parts into a coherent explanation
+        explanation = " ".join(explanation_parts)
+        
+        # Add confidence qualifier
+        if confidence_pct >= 90:
+            explanation += f", resulting in {confidence_pct:.1f}% overall confidence in this assessment."
+        elif confidence_pct >= 75:
+            explanation += f", leading to {confidence_pct:.1f}% confidence in the classification."
+        else:
+            explanation += f", though with moderate confidence ({confidence_pct:.1f}%) suggesting additional verification may be helpful."
+        
+        return explanation
+    
     def enhanced_predict(self, title: str, text: str, subject: str = "", pure_ml_mode: bool = False) -> Dict[str, Any]:
         """Enhanced prediction using multiple verification methods"""
         
@@ -212,6 +301,14 @@ class EnhancedFactChecker:
         
         # Pure ML mode - use only dataset-based models (99.8% accuracy)
         if pure_ml_mode:
+            explanation = self.generate_explanation(
+                base_result['prediction'], 
+                base_result['confidence'], 
+                {}, 
+                {'base_ml_confidence': base_result['confidence']}, 
+                pure_ml_mode=True
+            )
+            
             return {
                 'prediction': base_result['prediction'],
                 'confidence': base_result['confidence'],
@@ -225,7 +322,8 @@ class EnhancedFactChecker:
                     'mode': 'pure_ml',
                     'base_ml_confidence': base_result['confidence'],
                     'enhancements_bypassed': True
-                }
+                },
+                'explanation': explanation
             }
         
         # Analyze source credibility
@@ -262,6 +360,30 @@ class EnhancedFactChecker:
             final_prediction = base_result['prediction']  # Use ML prediction directly
             enhanced_confidence = enhanced_confidence  # Keep calculated confidence
         
+        analysis_data = {
+            **base_result['analysis'],
+            'source_credibility': source_analysis,
+            'fact_checks_found': len(fact_checks),
+            'fact_checks': fact_checks[:3],  # Top 3 fact checks
+            'pattern_analysis': pattern_analysis,
+            'verification_method': 'Enhanced Multi-Source Analysis'
+        }
+        
+        enhancement_details_data = {
+            'base_ml_confidence': base_confidence,
+            'source_credibility_score': source_score,
+            'pattern_adjustment': pattern_adjustment,
+            'final_confidence': enhanced_confidence
+        }
+        
+        # Generate explanation
+        explanation = self.generate_explanation(
+            final_prediction, 
+            enhanced_confidence, 
+            analysis_data, 
+            enhancement_details_data
+        )
+        
         return {
             'prediction': final_prediction,
             'confidence': float(enhanced_confidence),
@@ -269,19 +391,8 @@ class EnhancedFactChecker:
                 'FAKE': 1 - enhanced_confidence if final_prediction == "REAL" else enhanced_confidence,
                 'REAL': enhanced_confidence if final_prediction == "REAL" else 1 - enhanced_confidence
             },
-            'analysis': {
-                **base_result['analysis'],
-                'source_credibility': source_analysis,
-                'fact_checks_found': len(fact_checks),
-                'fact_checks': fact_checks[:3],  # Top 3 fact checks
-                'pattern_analysis': pattern_analysis,
-                'verification_method': 'Enhanced Multi-Source Analysis'
-            },
+            'analysis': analysis_data,
             'model_metrics': base_result['model_metrics'],
-            'enhancement_details': {
-                'base_ml_confidence': base_confidence,
-                'source_credibility_score': source_score,
-                'pattern_adjustment': pattern_adjustment,
-                'final_confidence': enhanced_confidence
-            }
+            'enhancement_details': enhancement_details_data,
+            'explanation': explanation
         } 
