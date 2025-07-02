@@ -1,0 +1,2 @@
+# In api/ directory, create file named "Procfile" (no extension)
+web: uvicorn main:app --host 0.0.0.0 --port $PORT

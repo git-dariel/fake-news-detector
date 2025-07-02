@@ -1,0 +1,9 @@
+# In api/ directory, create ".slugignore" to exclude large files
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.git/
+README.md
+.env
+tests/
