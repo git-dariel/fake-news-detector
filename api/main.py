@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from models.enhanced_fact_checker import EnhancedFactChecker
+import os
 
 app = FastAPI(
     title="Enhanced Fake News Detection API",
@@ -10,9 +11,16 @@ app = FastAPI(
 )
 
 # Enable CORS
+allowed_origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "https://fake-news-dev-db7d0723bbe5.herokuapp.com",
+    os.getenv("FRONTEND_URL", "")  # Allow configurable frontend URL
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=[origin for origin in allowed_origins if origin],  # Filter out empty strings
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -43,12 +51,13 @@ async def startup_event():
         print("✅ Enhanced API is ready to serve requests!")
         print("📊 Features: ML + Source Credibility + Pattern Analysis + Fact-Check Integration")
     except FileNotFoundError as e:
-        print(f"❌ Error: Dataset files not found: {e}")
-        print("Please ensure the CSV files are in the correct location: src/config/data/")
-        raise e
+        print(f"❌ Warning: Dataset files not found: {e}")
+        print("Attempting to continue with pre-trained models only...")
+        # Don't raise the error, try to continue with pre-trained models
     except Exception as e:
         print(f"❌ Error during model initialization: {e}")
-        raise e
+        print("Attempting to continue with basic functionality...")
+        # Don't raise the error, try to continue with basic functionality
 
 @app.get("/")
 async def root():
