@@ -372,22 +372,16 @@ class FakeNewsDetector:
     def get_dataset_stats(self):
         """Get statistics about the dataset"""
         if self.df is None:
-            # Try to load dataset if not already loaded
-            try:
-                print("Dataset not in memory, attempting to load...")
-                self.load_and_prepare_data(sample_size=10000)  # Load sample for stats
-            except Exception as e:
-                print(f"Failed to load dataset: {e}")
-                # Return placeholder stats if dataset can't be loaded
-                return {
-                    'total_articles': 0,
-                    'fake_articles': 0,
-                    'real_articles': 0,
-                    'subjects': {},
-                    'avg_text_length': 0.0,
-                    'avg_title_length': 0.0,
-                    'error': "Dataset loading failed"
-                }
+            # Return placeholder stats if dataset not loaded (production mode)
+            return {
+                'total_articles': 0,
+                'fake_articles': 0,
+                'real_articles': 0,
+                'subjects': {},
+                'avg_text_length': 0.0,
+                'avg_title_length': 0.0,
+                'error': "Dataset not available in production mode"
+            }
         
         stats = {
             'total_articles': len(self.df),

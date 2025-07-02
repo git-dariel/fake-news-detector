@@ -1,1 +1,1 @@
-web: cd api && uvicorn main:app --host 0.0.0.0 --port $PORT 
+web: cd api && export WEB_CONCURRENCY=1 uvicorn main:app --host 0.0.0.0 --port $PORT 

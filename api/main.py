@@ -89,9 +89,7 @@ async def root():
         "endpoints": {
             "predict": "/predict",
             "health": "/health",
-            "metrics": "/metrics",
-            "dataset-stats": "/dataset-stats",
-            "load-dataset-for-analytics": "/load-dataset-for-analytics"
+            "metrics": "/metrics"
         }
     }
 
@@ -166,37 +164,11 @@ async def get_model_metrics():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/dataset-stats")
-async def get_dataset_stats():
-    """Get statistics about the training dataset"""
-    try:
-        stats = detector.base_detector.get_dataset_stats()
-        if 'error' in stats:
-            stats['note'] = "Dataset not loaded in production mode. Use /load-dataset-for-analytics to load it."
-        return stats
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/load-dataset-for-analytics") 
-async def load_dataset_for_analytics():
-    """Load dataset for analytics (not normally loaded in production)"""
-    try:
-        print("Loading dataset for analytics...")
-        detector.base_detector.load_and_prepare_data(sample_size=10000)
-        return {
-            "message": "Dataset loaded successfully for analytics", 
-            "status": "completed",
-            "sample_size": 10000
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
 @app.post("/retrain-full-dataset")
 async def retrain_full_dataset():
     """Retrain models with the complete dataset for maximum accuracy"""
     try:
-        detector.base_detector.retrain_full_dataset()
-        return {"message": "Models retrained successfully with full dataset", "status": "completed"}
+        return {"error": "Dataset files not available in production deployment"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
